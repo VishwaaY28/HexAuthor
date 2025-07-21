@@ -1,16 +1,102 @@
 import React, { useEffect, useState } from 'react';
-import { FiFolder, FiPlus, FiSearch, FiTag } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+import { FiAlertTriangle, FiFolder, FiPlus, FiSearch, FiTag, FiTrash2, FiX } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useWorkspace } from '../../hooks/useWorkspace';
 import CreateWorkspaceModal from './CreateWorkspace';
 
+// Confirmation Modal Component
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: string;
+  confirmText?: string;
+  cancelText?: string;
+  isDestructive?: boolean;
+}
+
+const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  isDestructive = false,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center">
+      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-start mb-4">
+          <div className="flex-shrink-0">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              isDestructive ? 'bg-red-100' : 'bg-yellow-100'
+            }`}>
+              <FiAlertTriangle className={`w-5 h-5 ${
+                isDestructive ? 'text-red-600' : 'text-yellow-600'
+              }`} />
+            </div>
+          </div>
+          <div className="ml-3 flex-1">
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            <p className="text-sm text-gray-600 mt-1">{message}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <FiX className="w-5 h-5" />
+          </button>
+        </div>
+        
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              isDestructive
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-primary text-white hover:bg-primary/90'
+            }`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Workspaces: React.FC = () => {
   const navigate = useNavigate();
-  const { workspaces, getAllTags, filterWorkspaces, fetchWorkspaces, loading } = useWorkspace();
+  const { workspaces, getAllTags, filterWorkspaces, fetchWorkspaces, loading, deleteWorkspace } = useWorkspace();
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    workspaceId: string | null;
+    workspaceName: string;
+  }>({
+    isOpen: false,
+    workspaceId: null,
+    workspaceName: '',
+  });
 
   const debouncedSearch = useDebounce(search, 500);
 
@@ -40,6 +126,25 @@ const Workspaces: React.FC = () => {
   // Refresh workspaces after creating a new one
   const handleWorkspaceCreated = async () => {
     await fetchWorkspaces();
+  };
+
+  const handleDeleteWorkspace = async (e: React.MouseEvent, workspaceId: string, workspaceName: string) => {
+    e.stopPropagation(); // Prevent navigation when clicking delete
+    
+    setDeleteModal({
+      isOpen: true,
+      workspaceId,
+      workspaceName,
+    });
+  };
+
+  const confirmDeleteWorkspace = async () => {
+    if (!deleteModal.workspaceId) return;
+    
+    const success = await deleteWorkspace(deleteModal.workspaceId, true); // Using hard delete
+    if (success) {
+      toast.success('Workspace deleted successfully');
+    }
   };
 
   return (
@@ -114,8 +219,15 @@ const Workspaces: React.FC = () => {
                 <div
                   key={workspace.id}
                   onClick={() => navigate(`/dashboard/workspaces/${workspace.id}`)}
-                  className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer group"
+                  className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer group relative"
                 >
+                  <button
+                    onClick={(e) => handleDeleteWorkspace(e, workspace.id, workspace.name)}
+                    className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                    title="Delete workspace"
+                  >
+                    <FiTrash2 className="w-5 h-5" />
+                  </button>
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center mb-3">
@@ -191,6 +303,14 @@ const Workspaces: React.FC = () => {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreated={handleWorkspaceCreated}
+      />
+      <ConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ ...deleteModal, isOpen: false })}
+        onConfirm={confirmDeleteWorkspace}
+        title={`Delete Workspace: ${deleteModal.workspaceName}`}
+        message={`Are you sure you want to delete the workspace "${deleteModal.workspaceName}"? This action cannot be undone.`}
+        isDestructive
       />
     </div>
   );

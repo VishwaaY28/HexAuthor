@@ -61,6 +61,9 @@ async def create_workspace(data: WorkspaceCreateRequest):
         logger.info(f"Returning workspace data: {result}")
         return JSONResponse(result)
 
+    except ValueError as e:
+        logger.warning(f"Validation error creating workspace: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating workspace: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {str(e)}")

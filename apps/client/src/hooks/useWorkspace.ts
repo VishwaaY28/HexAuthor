@@ -156,7 +156,10 @@ export function useWorkspace() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
+      const err = await res.json().catch(() => ({ detail: 'Failed to create workspace' }));
+      if (err.detail?.includes('already exists')) {
+        throw new Error('A workspace with this name already exists. Please choose a different name.');
+      }
       throw new Error(err.detail || 'Failed to create workspace');
     }
     const ws = await res.json();
@@ -177,6 +180,35 @@ export function useWorkspace() {
     );
   }
 
+  async function deleteWorkspace(id: string, hard = false) {
+    setLoading(true);
+    try {
+      const endpoint = hard 
+        ? API.ENDPOINTS.WORKSPACES.DELETE_HARD(id)
+        : API.ENDPOINTS.WORKSPACES.DELETE_SOFT(id);
+      
+      const res = await fetch(API.BASE_URL() + API.ENDPOINTS.WORKSPACES.BASE_URL() + endpoint, {
+        method: 'DELETE',
+        headers: {
+          Authorization: localStorage.getItem('token')
+            ? `Bearer ${localStorage.getItem('token')}`
+            : '',
+        },
+      });
+      
+      if (!res.ok) throw new Error(`Failed to ${hard ? 'hard' : 'soft'} delete workspace`);
+      
+      // Remove the workspace from local state
+      setWorkspaces((prev) => prev.filter((workspace) => workspace.id !== id));
+      return true;
+    } catch (err: any) {
+      toast.error(err.message || `Could not delete workspace`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return {
     workspaces,
     loading,
@@ -188,5 +220,6 @@ export function useWorkspace() {
     getAllTags,
     createWorkspace,
     updateWorkspace,
+    deleteWorkspace,
   };
 }

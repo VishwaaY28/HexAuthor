@@ -21,6 +21,7 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOpen, onC
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedVertical, setSelectedVertical] = useState('');
   const [workspaceType, setWorkspaceType] = useState('');
+  const [nameError, setNameError] = useState('');
 
   // Update to accept both input and select events
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -56,8 +57,9 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOpen, onC
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setNameError('');
     if (!formData.name.trim()) {
-      toast.error('Workspace name is required');
+      setNameError('Workspace name is required');
       return;
     }
     if (!formData.clientName.trim()) {
@@ -77,7 +79,11 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOpen, onC
       if (onCreated) onCreated();
       onClose();
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create workspace. Please try again.');
+      if (error.message && error.message.includes('already exists')) {
+        setNameError(error.message);
+      } else {
+        toast.error(error.message || 'Failed to create workspace. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -139,6 +145,9 @@ const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({ isOpen, onC
                 required
               />
             </div>
+            {nameError && (
+              <p className="text-xs text-red-500 mt-1">{nameError}</p>
+            )}
             <p className="text-xs text-gray-500 mt-1">
               Choose a descriptive name for your workspace
             </p>

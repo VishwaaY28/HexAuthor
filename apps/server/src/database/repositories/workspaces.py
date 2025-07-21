@@ -1,11 +1,16 @@
 from database.models import Workspace, Tag, WorkspaceTag
-from tortoise.exceptions import DoesNotExist
+from tortoise.exceptions import DoesNotExist, IntegrityError
 from tortoise.transactions import in_transaction
 
 class WorkspaceRepository:
     @staticmethod
     async def create_workspace(name: str, client: str, tag_names: list[str], workspace_type: str = None):
         async with in_transaction():
+            # Check for case-insensitive uniqueness
+            existing_workspace = await Workspace.filter(name__iexact=name, deleted_at=None).first()
+            if existing_workspace:
+                raise ValueError(f"Workspace with name '{name}' already exists")
+            
             workspace = await Workspace.create(name=name, client=client, workspace_type=workspace_type)
 
             for tag_name in tag_names:
